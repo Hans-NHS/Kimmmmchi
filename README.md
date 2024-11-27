@@ -25,20 +25,23 @@
    cd kimmmmchidjango
 
 2. Install Python dependencies:
-pip install -r requirements.txt
+   ```bash
+   pip install -r requirements.txt
 
-3. Set up .env files (Backend: kimmmmchidjango/.env):
-SECRET_KEY=your-secret-key
-DEBUG=True
-DB_NAME=your-supabase-db-name
-DB_USER=your-supabase-user
-DB_PASSWORD=your-supabase-password
-DB_HOST=your-supabase-host
-DB_PORT=5432
+4. Set up .env files (Backend: kimmmmchidjango/.env):
+   ```
+   SECRET_KEY=your-secret-key
+   DEBUG=True
+   DB_NAME=your-supabase-db-name
+   DB_USER=your-supabase-user
+   DB_PASSWORD=your-supabase-password
+   DB_HOST=your-supabase-host
+   DB_PORT=5432
 
-4. Run Django server:
-python manage.py migrate
-python manage.py runserver
+5. Run Django server:
+   ```bash
+   python manage.py migrate
+   python manage.py runserver
 
 
 
