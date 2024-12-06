@@ -17,12 +17,21 @@ from decouple import config
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# settings.py
+
+#FOR API TESTING
+# CSRF_COOKIE_SECURE = False
+# CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000']
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY')
+
+# OPENAI API KEY
+OPENAI_API_KEY = config('OPENAI_API_KEY')
+PORTKEY_API_KEY = config('PORTKEY_API_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -39,6 +48,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'timetable',
+    'pdf_processor',
+    'dummy_timetable'
 ]
 
 MIDDLEWARE = [
