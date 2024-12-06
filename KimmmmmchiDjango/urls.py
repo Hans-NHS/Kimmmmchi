@@ -21,6 +21,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('pdf/', include('pdf_processor.urls')),
     path('timetable/', include('timetable.urls')),
-    #path('dummy_timetable/', include('dummy_timetable.urls')),
-    #path('chatbot/', include('Chatbot.urls')),
+    path("lang_graph/", include("lang_graph.urls")),
+    path("pdf_processor/", include("pdf_processor.urls")),
 ]

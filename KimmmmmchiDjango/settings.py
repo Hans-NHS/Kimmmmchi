@@ -49,8 +49,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'timetable',
-    'pdf_processor',
-    'dummy_timetable'
+    'pdf_processor', 
+    'lang_graph'
 ]
 
 MIDDLEWARE = [

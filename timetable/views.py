@@ -2,6 +2,8 @@ from django.http import JsonResponse
 from core.supabase_utils import fetch_data, insert_data
 from .utils import TimetableGenerator
 import json
+import logging
+logger = logging.getLogger(__name__)
 
 #GET request + user_id & semester -> mylist_id
 def fetch_mylist_id(request):
@@ -86,16 +88,19 @@ def fetch_class_details(request):
     except ValueError:
         return JsonResponse({"error": "'course_id' must be an integer."}, status=400)
 
-# timetable generation step 1 : fetch_mylist_id -> fetch_mylistclasses -> fetch_class_details
-def fetch_combined_details(request):
+# timetable generation step 1 : fetch_mylist_id -> fetch_mylistclasses -> fetch_class_details -> generate_timetable
+def fetch_and_generate(request):
     # GET query parameters
     user_id = request.GET.get("user_id")
     semester = request.GET.get("semester")
+    desired_credits = request.GET.get("desired_credits")
+
     if not user_id or not semester:
         return JsonResponse({"error": "Both 'user_id' and 'semester' are required."}, status=400)
 
     try:
         semester = int(semester)
+        desired_credits = int(desired_credits)
 
         # Step 1: Fetch mylist_id using user_id and semester
         mylist_filters = {"user_id": user_id, "semester": semester}
@@ -134,96 +139,80 @@ def fetch_combined_details(request):
             }
             course_details.append(course)
 
-        # combine course details as JSON
-        return JsonResponse({"courses": course_details}, safe=False)
+        timetable_generator = TimetableGenerator(course_details, desired_credits)
+        result = timetable_generator.generate_timetable()
+
+        if isinstance(result, str): # Error message
+            return JsonResponse({"error": result}, status=400)
+        else: # Normal timetable output
+            return JsonResponse({
+            "total_credits": result['total_credits'],
+            "course_ids": result['course_ids']
+        })
 
     except ValueError:
-        return JsonResponse({"error": "'semester' must be an integer."}, status=400)
+        return JsonResponse({"error": "'semester' must be an integer and 'desired_credits' must be a number."}, status=400)
+    except Exception as e:
+        logger.error(f"Error generating timetable: {str(e)}")
+        return JsonResponse({"error": "An unexpected error occurred."}, status=500)
 
-
-import logging
-logger = logging.getLogger(__name__)
-# create timetable & insert into it
-def create_timetable(request):
+# timetable generation step 2 : create timetable record & upload course_ids to timetableclasses
+def create_and_store(user_id, total_credits, course_ids):
     try:
-        # Hardcoded data for now
+        # Prepare timetable data
         timetable_data = {
-            "user_id": "f81171fe-636b-4113-a8a1-f7a83c17238a",
-            "total_credits": 12
+            "user_id": user_id,
+            "total_credits": total_credits,
         }
 
-        # Insert timetable record into the 'timetables' table
-        timetable = insert_data("timetables", timetable_data)
-        if not timetable:
-            return JsonResponse({"error": "Failed to create timetable."}, status=500)
+        # Insert timetable record
+        timetable_insert_response = insert_data("timetables", timetable_data)
 
-        # Extract timetable_id from the inserted data
-        timetable_id = timetable[0]["timetable_id"]
+        logger.debug(f"Timetable insert response: {timetable_insert_response}")
 
-        # Hardcoded list of course IDs (example)
-        course_ids = [1, 7, 24]
+        if not timetable_insert_response or not isinstance(timetable_insert_response, list):
+            return JsonResponse({"error": "Failed to retrieve timetable_id from insert response."}, status=500)
 
+        # Extract timetable_id from the response
+        timetable_id = timetable_insert_response[0].get("timetable_id")
+        if not timetable_id:
+            return JsonResponse({"error": "Failed to retrieve timetable_id from response data."}, status=500)
+
+        # Prepare timetable classes data
         timetable_classes_data = [
             {"timetable_id": timetable_id, "course_id": course_id}
             for course_id in course_ids
         ]
 
-        # Insert into 'timetableclasses' table
-        timetable_classes = insert_data("timetableclasses", timetable_classes_data)
-        if not timetable_classes:
+        # Insert timetable classes
+        timetable_classes_insert_response = insert_data("timetableclasses", timetable_classes_data)
+
+        logger.debug(f"Timetable classes insert response: {timetable_classes_insert_response}")
+
+        if not timetable_classes_insert_response:
             return JsonResponse({"error": "Failed to insert timetable classes."}, status=500)
 
-        return JsonResponse({"message": "Timetable and associated classes inserted successfully."})
+        return JsonResponse({
+            "message": "Timetable and classes created successfully.",
+            "timetable_id": timetable_id
+        }, status=201)
 
     except Exception as e:
-        return JsonResponse({"error": f"Error in create_timetable: {str(e)}"}, status=500)
+        logger.error(f"Error in create_and_store: {str(e)}")
+        return JsonResponse({"error": f"An unexpected error occurred: {str(e)}"}, status=500)
 
+#fetch -> generate -> store
+def timetable_main(request):
+    fetch_response = fetch_and_generate(request)
+    if fetch_response.status_code != 200:
+        return fetch_response  # Return error response from fetch_and_generate
 
-
-
-
-
-# timetable generation algorithm
-def generate_timetable(request):
+    fetch_data = json.loads(fetch_response.content.decode('utf-8'))
     user_id = request.GET.get("user_id")
-    semester = request.GET.get("semester")
-    desired_credits = request.GET.get("desired_credits")
-    
-    if not user_id or not semester or not desired_credits:
-        return JsonResponse({"error": "All 'user_id', 'semester', and 'desired_credits' are required."}, status=400)
 
-    try:
-        # Convert inputs to appropriate types
-        semester = int(semester)
-        desired_credits = float(desired_credits)
-
-        # Step 1 & 2: Fetch combined course details by calling the function directly
-        fetch_response = fetch_combined_details(request)
-        if fetch_response.status_code != 200:
-            return fetch_response  # Return the error response if any
-
-        # Parse the JSON response
-        combined_details = json.loads(fetch_response.content.decode("utf-8"))
-
-        # Extract data for the algorithm
-        courses = combined_details["courses"]
-        mylist = [{"class_ID": course["course_id"], "type": course["required_or_not"]} for course in courses]
-        class_details = {
-            course["course_id"]: {
-                "timeslot": course["timeslot"],
-                "credits": course["credit"]
-            }
-            for course in courses
-        }
-
-        # Step 3: Run the TimetableGenerator algorithm
-        generator = TimetableGenerator(mylist, class_details, desired_credits)
-        result = generator.generate_timetable()
-
-        # Return the generated timetable
-        return JsonResponse(result, safe=False)
-
-    except ValueError:
-        return JsonResponse({"error": "'semester' must be an integer and 'desired_credits' must be a number."}, status=400)
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    # Call create_and_store to save the data
+    return create_and_store(
+        user_id=user_id,
+        total_credits=fetch_data["total_credits"],
+        course_ids=fetch_data["course_ids"],
+    )
