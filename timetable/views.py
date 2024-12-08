@@ -89,6 +89,74 @@ def fetch_class_details(request):
         return JsonResponse({"error": "'course_id' must be an integer."}, status=400)
 
 # timetable generation step 1 : fetch_mylist_id -> fetch_mylistclasses -> fetch_class_details -> generate_timetable
+# def fetch_and_generate(request):
+#     # GET query parameters
+#     user_id = request.GET.get("user_id")
+#     semester = request.GET.get("semester")
+#     desired_credits = request.GET.get("desired_credits")
+
+#     if not user_id or not semester:
+#         return JsonResponse({"error": "Both 'user_id' and 'semester' are required."}, status=400)
+
+#     try:
+#         semester = int(semester)
+#         desired_credits = int(desired_credits)
+
+#         # Step 1: Fetch mylist_id using user_id and semester
+#         mylist_filters = {"user_id": user_id, "semester": semester}
+#         mylist_data = fetch_data("mylist", mylist_filters)
+#         if not mylist_data:
+#             return JsonResponse({"error": "No mylist found for the given user and semester."}, status=404)
+
+#         # Extract the mylist_id from the data
+#         mylist_id = mylist_data[0]["mylist_id"]
+
+#         # Step 2: Fetch courses for the mylist_id
+#         mylist_classes_filters = {"mylist_id": mylist_id}
+#         mylist_classes_data = fetch_data("mylistclasses", mylist_classes_filters)
+#         if not mylist_classes_data:
+#             return JsonResponse({"error": "No classes found for the given mylist_id."}, status=404)
+
+#         # Step 3: For each course, fetch class details (course_id, timeslot, credit, etc.)
+#         course_details = []
+#         for mylist_class in mylist_classes_data:
+#             course_id = mylist_class["course_id"]
+
+#             # Fetch course details
+#             courses_filters = {"course_id": course_id}
+#             course_data = fetch_data("courses", courses_filters)
+#             if not course_data:
+#                 continue  
+
+#             # Extract the course details
+#             course = {
+#                 "course_id": course_data[0]["course_id"],
+#                 "course_code": course_data[0]["course_code"],
+#                 "course_name": course_data[0]["course_name"],
+#                 "credit": course_data[0]["credit"],
+#                 "timeslot": course_data[0]["timeslot"],
+#                 "required_or_not": mylist_class["required_or_not"]
+#             }
+#             course_details.append(course)
+
+#         timetable_generator = TimetableGenerator(course_details, desired_credits)
+#         result = timetable_generator.generate_timetable()
+
+#         if isinstance(result, str): # Error message
+#             return JsonResponse({"error": result}, status=400)
+#         else: # Normal timetable output
+#             return JsonResponse({
+#             "total_credits": result['total_credits'],
+#             "course_ids": result['course_ids']
+#         })
+
+#     except ValueError:
+#         return JsonResponse({"error": "'semester' must be an integer and 'desired_credits' must be a number."}, status=400)
+#     except Exception as e:
+#         logger.error(f"Error generating timetable: {str(e)}")
+#         return JsonResponse({"error": "An unexpected error occurred."}, status=500)
+
+# timetable generation step 1 : fetch_mylist_id -> fetch_mylistclasses -> fetch_class_details -> generate_timetable
 def fetch_and_generate(request):
     # GET query parameters
     user_id = request.GET.get("user_id")
@@ -110,12 +178,15 @@ def fetch_and_generate(request):
 
         # Extract the mylist_id from the data
         mylist_id = mylist_data[0]["mylist_id"]
+        print(f"Fetched mylist_id: {mylist_id}")  # Debugging print
 
         # Step 2: Fetch courses for the mylist_id
         mylist_classes_filters = {"mylist_id": mylist_id}
         mylist_classes_data = fetch_data("mylistclasses", mylist_classes_filters)
         if not mylist_classes_data:
             return JsonResponse({"error": "No classes found for the given mylist_id."}, status=404)
+
+        print(f"Fetched mylist_classes: {mylist_classes_data}")  # Debugging print
 
         # Step 3: For each course, fetch class details (course_id, timeslot, credit, etc.)
         course_details = []
@@ -139,22 +210,27 @@ def fetch_and_generate(request):
             }
             course_details.append(course)
 
+        print(f"Fetched course details: {json.dumps(course_details, indent=4)}")  # Debugging print
+
+        # Step 4: Generate timetable using TimetableGenerator
         timetable_generator = TimetableGenerator(course_details, desired_credits)
         result = timetable_generator.generate_timetable()
 
-        if isinstance(result, str): # Error message
+        if isinstance(result, str):  # Error message
             return JsonResponse({"error": result}, status=400)
-        else: # Normal timetable output
+        else:  # Normal timetable output
+            print(f"Generated Timetable: {json.dumps(result, indent=4)}")  # Debugging print
             return JsonResponse({
-            "total_credits": result['total_credits'],
-            "course_ids": result['course_ids']
-        })
+                "total_credits": result['total_credits'],
+                "course_ids": result['course_ids']
+            })
 
     except ValueError:
         return JsonResponse({"error": "'semester' must be an integer and 'desired_credits' must be a number."}, status=400)
     except Exception as e:
         logger.error(f"Error generating timetable: {str(e)}")
         return JsonResponse({"error": "An unexpected error occurred."}, status=500)
+
 
 # timetable generation step 2 : create timetable record & upload course_ids to timetableclasses
 def create_and_store(user_id, total_credits, course_ids):

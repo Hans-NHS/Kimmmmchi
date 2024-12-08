@@ -1,8 +1,9 @@
-from django.shortcuts import render
-import asyncio
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
+from django.shortcuts import render
+
+import asyncio
 import json
 
 from lang_graph.Chatbot.chatbot import Chatbot  # Import the Chatbot class
@@ -19,6 +20,7 @@ def ask_chatbot(request):
 
             # Run the chatbot query asynchronously
             response = asyncio.run(chatbot.ainvoke(query, session_id))
+            
             return JsonResponse({"response": response}, status=200)
 
         except Exception as e:
